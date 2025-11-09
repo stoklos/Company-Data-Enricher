@@ -1,0 +1,5 @@
+{
+  "name": "Company Data Enricher",
+  "description": "Upload an Excel file with company names, and this app will use AI to find and add detailed information like websites, contacts, revenue, and laboratories, then provide a downloadable enriched file.",
+  "requestFramePermissions": []
+}
