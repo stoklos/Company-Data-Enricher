@@ -1,15 +1,16 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { EnrichedData } from '../types';
+import { API_KEY } from '../apiKey'; // ИЗМЕНЕНИЕ: Импортируем ключ отсюда
 
 // Declare XLSX to satisfy TypeScript since it's loaded from a CDN.
 declare var XLSX: any;
 
 export async function fetchCompanyData(companyName: string): Promise<{ data: EnrichedData | null; sources: { uri: string; title: string; }[] }> {
-  if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set");
+  if (!API_KEY) { // ИЗМЕНЕНИЕ: Проверяем импортированный ключ
+    throw new Error("API_KEY is not set in apiKey.ts file");
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: API_KEY }); // ИЗМЕНЕНИЕ: Используем импортированный ключ
 
   const prompt = `For the company "${companyName}", perform a comprehensive web search to find the following information. Please be as thorough as possible.
   
