@@ -2,10 +2,12 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Company } from './types';
 import { fetchCompanyData } from './services/geminiService';
-import { UploadIcon, ProcessingIcon, DoneIcon, ErrorIcon, DownloadIcon, ExcelIcon } from './components/icons';
+import { UploadIcon, ProcessingIcon, DoneIcon, ErrorIcon, DownloadIcon, ExcelIcon, DocumentTextIcon } from './components/icons';
 
 // Declare XLSX to satisfy TypeScript since it's loaded from a CDN.
 declare var XLSX: any;
+
+type InputTab = 'file' | 'text';
 
 const App: React.FC = () => {
     const [companies, setCompanies] = useState<Company[]>([]);
@@ -13,15 +15,24 @@ const App: React.FC = () => {
     const [isComplete, setIsComplete] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<InputTab>('file');
+    const [textInput, setTextInput] = useState<string>('');
+
+    const resetState = () => {
+        setCompanies([]);
+        setIsProcessing(false);
+        setIsComplete(false);
+        setError(null);
+        setFileName(null);
+        setTextInput('');
+    };
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
+        resetState();
         setFileName(file.name);
-        setError(null);
-        setIsComplete(false);
-        setCompanies([]);
 
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -57,6 +68,24 @@ const App: React.FC = () => {
         reader.readAsArrayBuffer(file);
     };
     
+    const handleTextSubmit = () => {
+        resetState();
+        setFileName('Pasted List');
+        const companyNames = textInput.split('\n').map(name => name.trim()).filter(name => name !== '');
+
+        if (companyNames.length === 0) {
+            setError("Please enter at least one company name.");
+            return;
+        }
+
+        const companyList: Company[] = companyNames.map((name, index) => ({
+            id: index,
+            name: name,
+            status: 'pending',
+        }));
+        setCompanies(companyList);
+    };
+
     const processCompanies = useCallback(async () => {
         setIsProcessing(true);
         setIsComplete(false);
@@ -118,27 +147,54 @@ const App: React.FC = () => {
                     </h1>
                     <p className="text-slate-500 text-lg italic">by stoklos</p>
                 </div>
-                <p className="text-slate-400">
+                <p className="text-slate-600">
                     Загрузите Excel, и ИИ найдет сайты, контакты, лаборатории и многое другое для каждой компании.
                 </p>
             </header>
 
             <main className="w-full max-w-5xl bg-base-200 rounded-2xl shadow-2xl p-6 sm:p-8 flex-grow">
                 {error && (
-                     <div className="bg-red-900/50 border border-accent-error text-red-200 p-4 rounded-lg mb-6">
+                     <div className="bg-red-100 border border-accent-error text-red-800 p-4 rounded-lg mb-6">
                         <strong>Error:</strong> {error}
                     </div>
                 )}
                 
                 {!companies.length && !isProcessing && (
-                    <div className="flex flex-col items-center justify-center h-full border-2 border-dashed border-base-300 rounded-lg p-12 text-center">
-                         <UploadIcon className="w-16 h-16 text-base-300 mb-4"/>
-                         <h2 className="text-xl font-semibold mb-2">Перетащите сюда свой Excel файл</h2>
-                         <p className="text-slate-400 mb-4">или</p>
-                         <label htmlFor="file-upload" className="cursor-pointer bg-brand-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                             Выберите файл
-                         </label>
-                         <input id="file-upload" type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
+                    <div>
+                        <div className="flex border-b border-base-300 mb-4">
+                            <button onClick={() => setActiveTab('file')} className={`flex items-center gap-2 py-2 px-4 font-medium transition-colors ${activeTab === 'file' ? 'border-b-2 border-brand-secondary text-brand-secondary' : 'text-slate-500 hover:text-slate-900'}`}>
+                                <ExcelIcon className="w-5 h-5" />
+                                Загрузить Excel
+                            </button>
+                             <button onClick={() => setActiveTab('text')} className={`flex items-center gap-2 py-2 px-4 font-medium transition-colors ${activeTab === 'text' ? 'border-b-2 border-brand-secondary text-brand-secondary' : 'text-slate-500 hover:text-slate-900'}`}>
+                                <DocumentTextIcon className="w-5 h-5" />
+                                Вставить список
+                            </button>
+                        </div>
+                        {activeTab === 'file' && (
+                             <div className="flex flex-col items-center justify-center h-full border-2 border-dashed border-base-300 rounded-lg p-12 text-center">
+                                 <UploadIcon className="w-16 h-16 text-slate-400 mb-4"/>
+                                 <h2 className="text-xl font-semibold mb-2 text-[#6C757D]">Перетащите сюда свой Excel файл</h2>
+                                 <p className="text-slate-500 mb-4">или</p>
+                                 <label htmlFor="file-upload" className="cursor-pointer bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                     Выберите файл
+                                 </label>
+                                 <input id="file-upload" type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
+                            </div>
+                        )}
+                        {activeTab === 'text' && (
+                             <div className="flex flex-col items-center justify-center h-full p-4">
+                                 <textarea
+                                    className="w-full h-48 bg-base-100 border border-base-300 rounded-lg p-3 text-slate-900 focus:ring-2 focus:ring-brand-secondary focus:outline-none transition-shadow"
+                                    placeholder="Введите названия компаний, каждую с новой строки..."
+                                    value={textInput}
+                                    onChange={(e) => setTextInput(e.target.value)}
+                                ></textarea>
+                                <button onClick={handleTextSubmit} className="mt-4 bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-2 px-6 rounded-lg transition-colors w-full sm:w-auto">
+                                    Отправить список
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
                 
@@ -146,11 +202,11 @@ const App: React.FC = () => {
                     <div>
                         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                            <div className="flex items-center gap-3">
-                                <ExcelIcon className="w-8 h-8 text-brand-light" />
+                                {fileName?.includes('Pasted') ? <DocumentTextIcon className="w-8 h-8 text-brand-secondary" /> : <ExcelIcon className="w-8 h-8 text-brand-secondary" />}
                                 <span className="font-medium text-lg">{fileName} ({companies.length} companies)</span>
                            </div>
                            {!isProcessing && !isComplete && (
-                                <button onClick={processCompanies} className="bg-brand-primary hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors w-full sm:w-auto">
+                                <button onClick={processCompanies} className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-2 px-6 rounded-lg transition-colors w-full sm:w-auto">
                                    Начать обработку
                                 </button>
                            )}
@@ -165,8 +221,8 @@ const App: React.FC = () => {
                          {isProcessing && (
                             <div className="mb-6">
                                 <div className="flex justify-between mb-1">
-                                    <span className="text-base font-medium text-brand-light">Processing...</span>
-                                    <span className="text-sm font-medium text-brand-light">{Math.round(progress)}%</span>
+                                    <span className="text-base font-medium text-brand-secondary">Processing...</span>
+                                    <span className="text-sm font-medium text-brand-secondary">{Math.round(progress)}%</span>
                                 </div>
                                 <div className="w-full bg-base-300 rounded-full h-2.5">
                                     <div className="bg-brand-secondary h-2.5 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
@@ -175,7 +231,7 @@ const App: React.FC = () => {
                         )}
 
                         {isComplete && (
-                             <div className="bg-green-900/50 border border-accent-success text-green-200 p-4 rounded-lg mb-6 text-center">
+                             <div className="bg-green-100 border border-accent-success text-green-800 p-4 rounded-lg mb-6 text-center">
                                 Поиск информации завершён, и можно скачать готовый файл!
                             </div>
                         )}
@@ -183,7 +239,7 @@ const App: React.FC = () => {
                         <div className="max-h-[50vh] overflow-y-auto pr-2">
                             <ul className="space-y-3">
                                 {companies.map(company => (
-                                    <li key={company.id} className="bg-base-300/50 p-3 rounded-lg flex items-center justify-between transition-all">
+                                    <li key={company.id} className="bg-slate-100 p-3 rounded-lg flex items-center justify-between transition-all">
                                         <span className="font-medium truncate pr-4">{company.name}</span>
                                         <div className="flex-shrink-0">
                                             {company.status === 'pending' && <span className="text-slate-500 text-sm">Pending</span>}
